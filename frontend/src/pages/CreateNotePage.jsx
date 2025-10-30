@@ -1,19 +1,17 @@
-import React, { use, useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router";
 import {
   FaArrowLeft,
   FaSave,
-  FaMagic,
   FaBold,
+  FaMagic,
   FaUnderline,
   FaItalic,
   FaStrikethrough,
   FaAlignLeft,
   FaAlignCenter,
   FaAlignRight,
-  FaCode,
-  FaParagraph,
   FaListUl,
   FaListOl,
   FaQuoteLeft,
@@ -21,29 +19,32 @@ import {
   FaUndo,
   FaRedo,
   FaImage,
+  FaDownload,
+  FaTrash,
 } from "react-icons/fa";
 import axios from "axios";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Heading from "@tiptap/extension-heading";
+import Blockquote from "@tiptap/extension-blockquote";
+import { TextStyle, FontFamily, Color } from "@tiptap/extension-text-style";
+import { Image } from "../components/tiptap-node/image-node/image-node-extension";
 import styles from "../styles/TiptapEditor.module.css";
 import Footer from "../components/Footer";
-import Blockquote from "@tiptap/extension-blockquote";
-import { TextStyle, FontFamily, Color, FontSize } from '@tiptap/extension-text-style'
 
-export default function CreateNotePage({ onSave }) {
+export default function CreateNotePage() {
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState("Just now");
   const [charCount, setCharCount] = useState(0);
   const [wordCount, setWordCount] = useState(0);
+  const [imageWidth, setImageWidth] = useState(400);
   const navigate = useNavigate();
   const { folderId: folder_id } = useParams();
 
-  // Initialize TipTap Editor
+  // 🧠 Initialize TipTap Editor
   const editor = useEditor({
     editorProps: {
       attributes: {
@@ -54,22 +55,20 @@ export default function CreateNotePage({ onSave }) {
       StarterKit.configure({ heading: false }),
       Heading.configure({ levels: [1, 2, 3] }),
       Underline,
-      TextAlign.configure({ types: ["heading", "paragraph", "listItem"] }),
-      Image.configure({ inline: false, allowBase64: false }),
+      TextAlign.configure({
+        types: ["heading", "paragraph", "listItem", "image"],
+      }),
       Blockquote,
       TextStyle,
       Color,
       FontFamily,
-      Image,
-      ImageUploadNode.configure({
-        accept: 'image/*',
-        maxSize: MAX_FILE_SIZE,
-        limit: 3,
-        upload: handleImageUpload,
-        onError: (error) => console.error('Upload failed:', error),
+      Image.configure({
+        HTMLAttributes: {
+          class: "custom-image-class",
+        },
       }),
     ],
-    content: "<p> Start writing your note here... </p>",
+    content: "<p>Start writing your note here...</p>",
     onUpdate: ({ editor }) => {
       const text = editor.getText();
       setCharCount(text.length);
@@ -79,10 +78,8 @@ export default function CreateNotePage({ onSave }) {
 
   if (!editor) return null;
 
-  // Toolbar Actions
+  // 🛠 Toolbar Actions
   const handleToolbarAction = (action, e) => {
-    if (!editor) return;
-
     switch (action) {
       case "bold":
         editor.chain().focus().toggleBold().run();
@@ -96,21 +93,6 @@ export default function CreateNotePage({ onSave }) {
       case "underline":
         editor.chain().focus().toggleUnderline().run();
         break;
-      case "text-align-left":
-        editor.chain().focus().setTextAlign('left').run();
-        break;
-      case "text-align-center":
-        editor.chain().focus().setTextAlign('center').run();
-        break;
-      case "text-align-right":
-        editor.chain().focus().setTextAlign('right').run();
-        break;
-      case "code":
-        editor.chain().focus().toggleCode().run();
-        break;
-      case "paragraph":
-        editor.chain().focus().setParagraph().run();
-        break;
       case "h1":
         editor.chain().focus().toggleHeading({ level: 1 }).run();
         break;
@@ -120,14 +102,23 @@ export default function CreateNotePage({ onSave }) {
       case "h3":
         editor.chain().focus().toggleHeading({ level: 3 }).run();
         break;
+      case "text-align-left":
+        editor.chain().focus().updateAttributes("image", { dataAlign: "left" }).run();
+        editor.chain().focus().setTextAlign("left").run();
+        break;
+      case "text-align-center":
+        editor.chain().focus().updateAttributes("image", { dataAlign: "center" }).run();
+        editor.chain().focus().setTextAlign("center").run();
+        break;
+      case "text-align-right":
+        editor.chain().focus().updateAttributes("image", { dataAlign: "right" }).run();
+        editor.chain().focus().setTextAlign("right").run();
+        break;
       case "bullet-list":
         editor.chain().focus().toggleBulletList().run();
         break;
       case "ordered-list":
         editor.chain().focus().toggleOrderedList().run();
-        break;
-      case "code-block":
-        editor.chain().focus().toggleCodeBlock().run();
         break;
       case "blockquote":
         editor.chain().focus().toggleBlockquote().run();
@@ -135,75 +126,78 @@ export default function CreateNotePage({ onSave }) {
       case "horizontal-rule":
         editor.chain().focus().setHorizontalRule().run();
         break;
-      case "image":
-        editor.chain().focus().setImageUploadNode().run()
-        break;
       case "undo":
         editor.chain().focus().undo().run();
         break;
       case "redo":
         editor.chain().focus().redo().run();
         break;
+      case "image":
+        document.getElementById("imageUploadInput").click();
+        break;
       case "set-color":
         editor.chain().focus().setColor(e.currentTarget.value).run();
         break;
-      case "set-font-family":
-        editor.chain().focus().setFontFamily(`${e.target.value}`).run();
+      case "delete-image":
+        editor.chain().focus().deleteSelection().run();
         break;
+      case "download-image": {
+        const { state } = editor;
+        const node = state.selection.node;
+        if (node && node.attrs.src) {
+          const link = document.createElement("a");
+          link.href = node.attrs.src;
+          link.download = "image.jpg";
+          link.click();
+        }
+        break;
+      }
       default:
         break;
     }
   };
 
-  // Image Upload
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
+  // 🖼️ Image Upload to Cloudinary
+  const handleImageUpload = async (file) => {
+    const uploadPreset = "Notes_Image_Handler";
+    const cloudName = "dfxzehbmv";
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
 
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await axios.post("/api/uploads/images", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const imageUrl = response.data.url;
-      editor.chain().focus().setImage({ src: imageUrl }).run();
-    } catch (err) {
-      console.error("Image upload failed:", err);
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const imageUrl = response.data.secure_url;
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src: imageUrl,
+          width: `${imageWidth}px`,
+          dataAlign: "center",
+        })
+        .run();
+    } catch (error) {
+      console.error("Image upload failed:", error);
     }
   };
 
-  // Save Note
+  // 💾 Save Note
   const handleSave = async () => {
     setSaving(true);
     try {
-
       const content = JSON.stringify(editor.getJSON());
-
       const token = localStorage.getItem("accessToken");
-
       await axios.post(
         "http://localhost:3000/api/notes",
-        {
-          title,
-          content,
-          folder_id
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { title, content, folder_id },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
       setLastSaved(new Date().toLocaleTimeString());
-
       navigate("/");
     } catch (err) {
       console.error(err);
@@ -212,30 +206,29 @@ export default function CreateNotePage({ onSave }) {
     }
   };
 
-  // Toolbar Button Data
+  // 🧰 Toolbar Buttons
   const toolbarButtons = [
     { label: "Bold", action: "bold", icon: FaBold },
     { label: "Italic", action: "italic", icon: FaItalic },
     { label: "Underline", action: "underline", icon: FaUnderline },
     { label: "Strike", action: "strike", icon: FaStrikethrough },
-    { label: "Text Align Left", action: "text-align-left", icon: FaAlignLeft },
-    { label: "Text Align Center", action: "text-align-center", icon: FaAlignCenter },
-    { label: "Text Align Right", action: "text-align-right", icon: FaAlignRight },
-    { label: "Code", action: "code", icon: FaCode },
-    { label: "Paragraph", action: "paragraph", icon: FaParagraph },
     { label: "H1", action: "h1" },
     { label: "H2", action: "h2" },
     { label: "H3", action: "h3" },
+    { label: "Align Left", action: "text-align-left", icon: FaAlignLeft },
+    { label: "Align Center", action: "text-align-center", icon: FaAlignCenter },
+    { label: "Align Right", action: "text-align-right", icon: FaAlignRight },
     { label: "Bullet List", action: "bullet-list", icon: FaListUl },
     { label: "Ordered List", action: "ordered-list", icon: FaListOl },
-    { label: "Code Block", action: "code-block", icon: FaCode },
     { label: "Blockquote", action: "blockquote", icon: FaQuoteLeft },
     { label: "Horizontal Rule", action: "horizontal-rule", icon: FaMinus },
     { label: "Undo", action: "undo", icon: FaUndo },
     { label: "Redo", action: "redo", icon: FaRedo },
-    { label: "Image", action: "image", icon: FaImage },
     { label: "", action: "set-color" },
     { label: "", action: "set-font-family" },
+    { label: "Image", action: "image", icon: FaImage },
+    { label: "Download Image", action: "download-image", icon: FaDownload },
+    { label: "Delete Image", action: "delete-image", icon: FaTrash },
   ];
 
   return (
@@ -246,16 +239,13 @@ export default function CreateNotePage({ onSave }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        {/* Background Effects */}
-        <motion.div
-          className="absolute w-[30rem] h-[30rem] rounded-full bg-blue-600/20 blur-[180px] top-[-10%] left-[-10%] pointer-events-none"
-          animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
-          transition={{ duration: 10, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute w-[25rem] h-[25rem] rounded-full bg-purple-600/20 blur-[150px] bottom-[-10%] right-[-10%] pointer-events-none"
-          animate={{ opacity: [0.2, 0.4, 0.2], scale: [1, 1.05, 1] }}
-          transition={{ duration: 12, repeat: Infinity }}
+        {/* Hidden File Input */}
+        <input
+          id="imageUploadInput"
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => handleImageUpload(e.target.files[0])}
         />
 
         {/* Header */}
@@ -297,46 +287,26 @@ export default function CreateNotePage({ onSave }) {
           </motion.div>
         </div>
 
-        {/* Title */}
-        <motion.input
+        {/* Title Input */}
+        <input
           type="text"
           placeholder="Enter note title..."
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full text-[30px] font-bold bg-transparent border-b border-blue-500/40 outline-none focus:border-blue-400 transition duration-300 pb-3 mb-8 placeholder-gray-500"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          className="w-full text-[30px] font-bold bg-transparent border-b border-blue-500/40 outline-none focus:border-blue-400 pb-3 mb-6 placeholder-gray-500"
         />
 
         {/* Toolbar */}
-        <div
-          className="
-    flex flex-wrap items-center gap-2
-    bg-[#0e1a2b]/70 border border-blue-500/20 rounded-xl
-    px-3 py-2 mb-4 backdrop-blur-xl shadow-md shadow-blue-900/10
-    overflow-x-auto
-    max-w-full
-    sm:justify-start justify-center
-  "
-        >
+        <div className="flex flex-wrap items-center gap-2 bg-[#0e1a2b]/70 border border-blue-500/20 rounded-xl px-3 py-2 mb-4 backdrop-blur-xl shadow-md">
           {toolbarButtons.map(({ label, icon: Icon, action }, i) => (
-            <div key={i} className="flex items-center">
-              <button
-                onClick={(e) => handleToolbarAction(action, e)}
-                title={label}
-                className="
-          p-2 rounded-md
-          hover:bg-blue-600/20
-          text-gray-300 hover:text-white
-          transition text-sm
-          flex items-center
-        "
-              >
-                {Icon ? <Icon size={11} /> : label}
-              </button>
+            <button
+              key={i}
+              onClick={(e) => handleToolbarAction(action, e)}
+              title={label}
+              className="p-2 rounded-md hover:bg-blue-600/20 text-gray-300 hover:text-white transition text-sm flex items-center"
+            >
+              {Icon ? <Icon size={11} /> : label}
 
-              {/* 🎨 Color Picker */}
               {action === "set-color" && (
                 <input
                   type="color"
@@ -346,7 +316,7 @@ export default function CreateNotePage({ onSave }) {
                 />
               )}
 
-              {/* 🖋️ Font Family Dropdown */}
+
               {action === "set-font-family" && (
                 <select
                   onChange={(e) => handleToolbarAction(action, e)}
@@ -362,23 +332,39 @@ export default function CreateNotePage({ onSave }) {
                   <option value="Arial">Arial</option>
                 </select>
               )}
-            </div>
+
+            </button>
           ))}
+
+          {/* 🎚 Image Width Slider */}
+          <div className="ml-4 flex items-center gap-2 text-xs text-gray-400">
+            <label htmlFor="resize" className="whitespace-nowrap">
+              Image width:
+            </label>
+            <input
+              type="range"
+              id="resize"
+              min="100"
+              max="800"
+              step="10"
+              value={imageWidth}
+              onChange={(e) => {
+                setImageWidth(e.target.value);
+                editor
+                  .chain()
+                  .focus()
+                  .updateAttributes("image", { width: `${e.target.value}px` })
+                  .run();
+              }}
+              className="w-32 cursor-pointer"
+            />
+            <span>{imageWidth}px</span>
+          </div>
         </div>
-
-
-        {/* Hidden file input for image upload */}
-        <input
-          id="imageUploadInput"
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={handleImageUpload}
-        />
 
         {/* Editor */}
         <motion.div
-          className="bg-[#0e1a2b]/60 backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
+          className="bg-[#000000] backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
@@ -399,6 +385,7 @@ export default function CreateNotePage({ onSave }) {
           <p>Last saved: {lastSaved}</p>
         </motion.div>
       </motion.div>
+
       <Footer />
     </>
   );

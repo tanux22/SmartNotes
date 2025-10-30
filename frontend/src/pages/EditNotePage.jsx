@@ -19,26 +19,29 @@ import {
   FaQuoteLeft,
   FaMinus,
   FaUndo,
+  FaDownload,
   FaRedo,
+  FaTrash,
   FaImage,
 } from "react-icons/fa";
 import axios from "axios";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Heading from "@tiptap/extension-heading";
 import styles from "../styles/TiptapEditor.module.css";
 import Footer from "../components/Footer";
 import Blockquote from "@tiptap/extension-blockquote";
-import { TextStyle, FontFamily, Color, FontSize } from '@tiptap/extension-text-style'
+import { Image } from "../components/tiptap-node/image-node/image-node-extension";
+import { TextStyle, FontFamily, Color } from '@tiptap/extension-text-style'
 
 export default function EditNotePage({ onSave }) {
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState("Just now");
   const [charCount, setCharCount] = useState(0);
+  const [imageWidth, setImageWidth] = useState(400);
   const [wordCount, setWordCount] = useState(0);
   const navigate = useNavigate();
   const { noteId: note_id } = useParams();
@@ -55,12 +58,16 @@ export default function EditNotePage({ onSave }) {
       StarterKit.configure({ heading: false }),
       Heading.configure({ levels: [1, 2, 3] }),
       Underline,
-      TextAlign.configure({ types: ["heading", "paragraph", "listItem"] }),
-      Image.configure({ inline: false, allowBase64: false }),
+      TextAlign.configure({ types: ["heading", "paragraph", "listItem", "image"] }),
       Blockquote,
       TextStyle,
       Color,
       FontFamily,
+      Image.configure({
+        HTMLAttributes: {
+          class: "custom-image-class",
+        },
+      }),
     ],
     content: "<p> Start writing your note here... </p>",
     onUpdate: ({ editor }) => {
@@ -95,12 +102,15 @@ export default function EditNotePage({ onSave }) {
         break;
       case "text-align-left":
         editor.chain().focus().setTextAlign('left').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "left" }).run();
         break;
       case "text-align-center":
         editor.chain().focus().setTextAlign('center').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "center" }).run();
         break;
       case "text-align-right":
         editor.chain().focus().setTextAlign('right').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "right" }).run();
         break;
       case "code":
         editor.chain().focus().toggleCode().run();
@@ -141,14 +151,56 @@ export default function EditNotePage({ onSave }) {
       case "image":
         document.getElementById("imageUploadInput").click();
         break;
+      case "delete-image":
+        editor.chain().focus().deleteSelection().run();
+        break;
       case "set-color":
         editor.chain().focus().setColor(e.currentTarget.value).run();
         break;
       case "set-font-family":
         editor.chain().focus().setFontFamily(`${e.target.value}`).run();
         break;
+      case "download-image": {
+        const { state } = editor;
+        const node = state.selection.node;
+        if (node && node.attrs.src) {
+          const link = document.createElement("a");
+          link.href = node.attrs.src;
+          link.download = "image.jpg";
+          link.click();
+        }
+        break;
+      }
       default:
         break;
+    }
+  };
+
+  const handleImageUpload = async (file) => {
+    const uploadPreset = "Notes_Image_Handler";
+    const cloudName = "dfxzehbmv";
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    try {
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const imageUrl = response.data.secure_url;
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src: imageUrl,
+          width: `${imageWidth}px`,
+          dataAlign: "center",
+        })
+        .run();
+    } catch (error) {
+      console.error("Image upload failed:", error);
     }
   };
 
@@ -171,29 +223,6 @@ export default function EditNotePage({ onSave }) {
     }
   };
 
-  // Image Upload
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("image", file);
-
-    try {
-      const token = localStorage.getItem("accessToken");
-      const response = await axios.post("/api/uploads/images", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const imageUrl = response.data.url;
-      editor.chain().focus().setImage({ src: imageUrl }).run();
-    } catch (err) {
-      console.error("Image upload failed:", err);
-    }
-  };
 
   // Save Note
   const handleSave = async () => {
@@ -251,26 +280,25 @@ export default function EditNotePage({ onSave }) {
     { label: "Image", action: "image", icon: FaImage },
     { label: "", action: "set-color" },
     { label: "", action: "set-font-family" },
+    { label: "Download Image", action: "download-image", icon: FaDownload },
+    { label: "Delete Image", action: "delete-image", icon: FaTrash },
   ];
 
   return (
     <>
       <motion.div
-        className="h-screen pt-20 px-10 py-10 bg-gradient-to-br from-[#050510] via-[#0c0c1f] to-[#131336] text-gray-100 relative overflow-y-auto"
+        className="min-h-screen max-h-screen pt-20 px-10 py-10 bg-gradient-to-br from-[#050510] via-[#0c0c1f] to-[#131336] text-gray-100 relative overflow-y-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        {/* Background Effects */}
-        <motion.div
-          className="absolute w-[30rem] h-[30rem] rounded-full bg-blue-600/20 blur-[180px] top-[-10%] left-[-10%] pointer-events-none"
-          animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
-          transition={{ duration: 10, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute w-[25rem] h-[25rem] rounded-full bg-purple-600/20 blur-[150px] bottom-[-10%] right-[-10%] pointer-events-none"
-          animate={{ opacity: [0.2, 0.4, 0.2], scale: [1, 1.05, 1] }}
-          transition={{ duration: 12, repeat: Infinity }}
+        
+        <input
+          id="imageUploadInput"
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => handleImageUpload(e.target.files[0])}
         />
 
         {/* Header */}
@@ -383,17 +411,33 @@ export default function EditNotePage({ onSave }) {
 
 
         {/* Hidden file input for image upload */}
-        <input
-          id="imageUploadInput"
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={handleImageUpload}
-        />
+        <div className="ml-4 flex items-center gap-2 text-xs text-gray-400">
+          <label htmlFor="resize" className="whitespace-nowrap">
+            Image width:
+          </label>
+          <input
+            type="range"
+            id="resize"
+            min="100"
+            max="800"
+            step="10"
+            value={imageWidth}
+            onChange={(e) => {
+              setImageWidth(e.target.value);
+              editor
+                .chain()
+                .focus()
+                .updateAttributes("image", { width: `${e.target.value}px` })
+                .run();
+            }}
+            className="w-32 cursor-pointer"
+          />
+          <span>{imageWidth}px</span>
+        </div>
 
         {/* Editor */}
         <motion.div
-          className="bg-[#0e1a2b]/60 backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
+          className="bg-[#000000] backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
@@ -413,7 +457,7 @@ export default function EditNotePage({ onSave }) {
           </p>
           <p>Last saved: {lastSaved}</p>
         </motion.div>
-      </motion.div>
+      </motion.div >
       <Footer />
     </>
   );
