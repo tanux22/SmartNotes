@@ -152,10 +152,35 @@ body {
 
 /* Dark mode improvements */
 @media (prefers-color-scheme: dark) {
+
   .editor h1,
   .editor h2,
   .editor h3,
   .editor p {
     color: #e2e8f0;
   }
+}
+
+.editor img {
+  display: block !important;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 1rem auto;
+}
+
+/* ✅ Ensure alignment rules override Tailwind’s resets */
+.editor img[data-align="left"] {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.editor img[data-align="center"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.editor img[data-align="right"] {
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }

@@ -33,7 +33,7 @@ app.use(morgan('dev'));
 
 connectDB();
 
-// app.use(redisRateLimiter(20, 10));
+// app.use(redisRateLimiter(100, 10));
 
 app.use(responseHandler);
 

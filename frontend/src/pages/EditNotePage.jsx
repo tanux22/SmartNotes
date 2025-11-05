@@ -1,4 +1,4 @@
-import React, { use, useState, useEffect } from "react";
+import React, { use, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router";
 import {
@@ -19,30 +19,39 @@ import {
   FaQuoteLeft,
   FaMinus,
   FaUndo,
+  FaDownload,
   FaRedo,
+  FaTrash,
+  FaMicrophone,
+  FaMicrophoneSlash,
   FaImage,
 } from "react-icons/fa";
 import axios from "axios";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Heading from "@tiptap/extension-heading";
 import styles from "../styles/TiptapEditor.module.css";
 import Footer from "../components/Footer";
 import Blockquote from "@tiptap/extension-blockquote";
-import { TextStyle, FontFamily, Color, FontSize } from '@tiptap/extension-text-style'
+import { Image } from "../components/tiptap-node/image-node/image-node-extension";
+import { TextStyle, FontFamily, Color } from '@tiptap/extension-text-style'
+import AIGeneratorModal from "../components/AIGeneratorModal";
 
 export default function EditNotePage({ onSave }) {
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState("Just now");
   const [charCount, setCharCount] = useState(0);
+  const [imageWidth, setImageWidth] = useState(400);
   const [wordCount, setWordCount] = useState(0);
   const navigate = useNavigate();
   const { noteId: note_id } = useParams();
+  const [isListening, setIsListening] = useState(false);
   const [note, setNote] = useState({});
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const recognitionRef = React.useRef(null);
 
   // Initialize TipTap Editor
   const editor = useEditor({
@@ -55,12 +64,16 @@ export default function EditNotePage({ onSave }) {
       StarterKit.configure({ heading: false }),
       Heading.configure({ levels: [1, 2, 3] }),
       Underline,
-      TextAlign.configure({ types: ["heading", "paragraph", "listItem"] }),
-      Image.configure({ inline: false, allowBase64: false }),
+      TextAlign.configure({ types: ["heading", "paragraph", "listItem", "image"] }),
       Blockquote,
       TextStyle,
       Color,
       FontFamily,
+      Image.configure({
+        HTMLAttributes: {
+          class: "custom-image-class",
+        },
+      }),
     ],
     content: "<p> Start writing your note here... </p>",
     onUpdate: ({ editor }) => {
@@ -69,6 +82,62 @@ export default function EditNotePage({ onSave }) {
       setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
     },
   });
+
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      console.warn("Speech Recognition API not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        transcript += result[0].transcript;
+      }
+
+      if (editor && transcript.trim()) {
+        editor.commands.focus("end");
+        editor.commands.insertContent(transcript + " ");
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, [editor]);
+
+  const toggleListening = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      recognition.start();
+      setIsListening(true);
+    }
+  };
 
   if (!editor) return null;
 
@@ -95,12 +164,15 @@ export default function EditNotePage({ onSave }) {
         break;
       case "text-align-left":
         editor.chain().focus().setTextAlign('left').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "left" }).run();
         break;
       case "text-align-center":
         editor.chain().focus().setTextAlign('center').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "center" }).run();
         break;
       case "text-align-right":
         editor.chain().focus().setTextAlign('right').run();
+        editor.chain().focus().updateAttributes("image", { dataAlign: "right" }).run();
         break;
       case "code":
         editor.chain().focus().toggleCode().run();
@@ -141,14 +213,56 @@ export default function EditNotePage({ onSave }) {
       case "image":
         document.getElementById("imageUploadInput").click();
         break;
+      case "delete-image":
+        editor.chain().focus().deleteSelection().run();
+        break;
       case "set-color":
         editor.chain().focus().setColor(e.currentTarget.value).run();
         break;
       case "set-font-family":
         editor.chain().focus().setFontFamily(`${e.target.value}`).run();
         break;
+      case "download-image": {
+        const { state } = editor;
+        const node = state.selection.node;
+        if (node && node.attrs.src) {
+          const link = document.createElement("a");
+          link.href = node.attrs.src;
+          link.download = "image.jpg";
+          link.click();
+        }
+        break;
+      }
       default:
         break;
+    }
+  };
+
+  const handleImageUpload = async (file) => {
+    const uploadPreset = "Notes_Image_Handler";
+    const cloudName = "dfxzehbmv";
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    try {
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const imageUrl = response.data.secure_url;
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src: imageUrl,
+          width: `${imageWidth}px`,
+          dataAlign: "center",
+        })
+        .run();
+    } catch (error) {
+      console.error("Image upload failed:", error);
     }
   };
 
@@ -171,29 +285,6 @@ export default function EditNotePage({ onSave }) {
     }
   };
 
-  // Image Upload
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("image", file);
-
-    try {
-      const token = localStorage.getItem("accessToken");
-      const response = await axios.post("/api/uploads/images", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const imageUrl = response.data.url;
-      editor.chain().focus().setImage({ src: imageUrl }).run();
-    } catch (err) {
-      console.error("Image upload failed:", err);
-    }
-  };
 
   // Save Note
   const handleSave = async () => {
@@ -251,26 +342,39 @@ export default function EditNotePage({ onSave }) {
     { label: "Image", action: "image", icon: FaImage },
     { label: "", action: "set-color" },
     { label: "", action: "set-font-family" },
+    { label: "Download Image", action: "download-image", icon: FaDownload },
+    { label: "Delete Image", action: "delete-image", icon: FaTrash },
   ];
+
+  const handleAIContentAccept = (generatedText) => {
+    if (editor) {
+      editor.chain().focus().insertContent(generatedText).run();
+    }
+  };
 
   return (
     <>
+
+      <AIGeneratorModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onAccept={handleAIContentAccept}
+      />
+
+
       <motion.div
-        className="h-screen pt-20 px-10 py-10 bg-gradient-to-br from-[#050510] via-[#0c0c1f] to-[#131336] text-gray-100 relative overflow-y-auto"
+        className="min-h-screen max-h-screen pt-20 px-10 py-10 bg-gradient-to-br from-[#050510] via-[#0c0c1f] to-[#131336] text-gray-100 relative overflow-y-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        {/* Background Effects */}
-        <motion.div
-          className="absolute w-[30rem] h-[30rem] rounded-full bg-blue-600/20 blur-[180px] top-[-10%] left-[-10%] pointer-events-none"
-          animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
-          transition={{ duration: 10, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute w-[25rem] h-[25rem] rounded-full bg-purple-600/20 blur-[150px] bottom-[-10%] right-[-10%] pointer-events-none"
-          animate={{ opacity: [0.2, 0.4, 0.2], scale: [1, 1.05, 1] }}
-          transition={{ duration: 12, repeat: Infinity }}
+
+        <input
+          id="imageUploadInput"
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => handleImageUpload(e.target.files[0])}
         />
 
         {/* Header */}
@@ -298,26 +402,102 @@ export default function EditNotePage({ onSave }) {
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.6 }}
           >
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-fuchsia-600 to-purple-500 text-white rounded-lg hover:brightness-110 transition shadow-md shadow-fuchsia-600/30">
+
+            {/* 🎙 Blue Droplet Mic Button (smaller & cohesive) */}
+            <motion.button
+              onClick={toggleListening}
+              whileTap={{ scale: 0.9 }}
+              animate={{
+                scale: isListening ? 1.05 : 1,
+                y: isListening ? [-1, 1, -1] : 0,
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: isListening ? Infinity : 0,
+                ease: "easeInOut",
+              }}
+              className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
+      ${isListening
+                  ? "bg-gradient-to-br from-[#3b82f6] to-[#2563eb]" // active blue
+                  : "bg-gradient-to-br from-[#2563eb] to-[#1d4ed8]" // normal blue
+                }
+      shadow-[inset_1px_1px_3px_rgba(255,255,255,0.2),inset_-2px_-2px_6px_rgba(0,0,0,0.4),0_5px_10px_rgba(0,0,0,0.5)]
+      hover:shadow-[0_0_8px_1px_rgba(37,99,235,0.2)]
+      hover:scale-105
+      overflow-hidden`}
+              title={isListening ? "Stop Recording" : "Start Voice Input"}
+            >
+              {/* Highlight Reflection */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/20 to-white/40 opacity-70 blur-[2px] pointer-events-none" />
+
+              {/* Subsurface Glow */}
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-8 h-3 bg-white/20 blur-lg rounded-full opacity-50" />
+
+              {/* Pulse when active */}
+              {isListening && (
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-blue-500/40 blur-2xl"
+                  initial={{ opacity: 0.4, scale: 0.9 }}
+                  animate={{ opacity: [0.3, 0.8, 0.3], scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+              {/* Mic Icon */}
+              <motion.div
+                animate={{
+                  scale: isListening ? [1, 1.15, 1] : 1,
+                  y: isListening ? [0, -2, 0] : 0,
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: isListening ? Infinity : 0,
+                  ease: "easeInOut",
+                }}
+                className="relative z-10 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+              >
+                {isListening ? (
+                  <FaMicrophoneSlash size={16} />
+                ) : (
+                  <FaMicrophone size={16} />
+                )}
+              </motion.div>
+            </motion.button>
+
+            {/* 🪄 Generate with AI */}
+            <button
+              onClick={() => setIsAIModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm 
+        rounded-full bg-gradient-to-r from-fuchsia-600 to-purple-500 
+        text-white font-medium transition-all duration-300
+        shadow-[inset_1px_1px_3px_rgba(255,255,255,0.15),inset_-2px_-2px_6px_rgba(0,0,0,0.4),0_5px_10px_rgba(0,0,0,0.5)]
+        hover:shadow-[0_0_8px_1px_rgba(37,99,235,0.2)]
+        hover:scale-105"
+            >
               <FaMagic size={14} /> Generate using AI
             </button>
-
+            {/* 💾 Save Note */}
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-indigo-500 text-white rounded-lg hover:brightness-110 transition shadow-md shadow-blue-600/30"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm 
+        rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 
+        text-white font-medium transition-all duration-300
+        shadow-[inset_1px_1px_3px_rgba(255,255,255,0.15),inset_-2px_-2px_6px_rgba(0,0,0,0.4),0_5px_10px_rgba(0,0,0,0.5)]
+        hover:shadow-[0_0_8px_1px_rgba(37,99,235,0.2)]
+        hover:scale-105"
             >
               <FaSave size={14} /> {saving ? "Saving..." : "Save Note"}
             </button>
           </motion.div>
-        </div>
+        </div >
 
         {/* Title */}
-        <motion.input
+        < motion.input
           type="text"
           placeholder="Enter note title..."
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value)
+          }
           className="w-full text-[30px] font-bold bg-transparent border-b border-blue-500/40 outline-none focus:border-blue-400 transition duration-300 pb-3 mb-8 placeholder-gray-500"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -383,17 +563,33 @@ export default function EditNotePage({ onSave }) {
 
 
         {/* Hidden file input for image upload */}
-        <input
-          id="imageUploadInput"
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={handleImageUpload}
-        />
+        <div className="ml-4 flex items-center gap-2 text-xs text-gray-400">
+          <label htmlFor="resize" className="whitespace-nowrap">
+            Image width:
+          </label>
+          <input
+            type="range"
+            id="resize"
+            min="100"
+            max="800"
+            step="10"
+            value={imageWidth}
+            onChange={(e) => {
+              setImageWidth(e.target.value);
+              editor
+                .chain()
+                .focus()
+                .updateAttributes("image", { width: `${e.target.value}px` })
+                .run();
+            }}
+            className="w-32 cursor-pointer"
+          />
+          <span>{imageWidth}px</span>
+        </div>
 
         {/* Editor */}
         <motion.div
-          className="bg-[#0e1a2b]/60 backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
+          className="bg-[#000000] backdrop-blur-2xl border border-blue-500/20 rounded-2xl shadow-lg overflow-hidden p-5 text-white h-[34rem] overflow-y-auto"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
@@ -413,7 +609,7 @@ export default function EditNotePage({ onSave }) {
           </p>
           <p>Last saved: {lastSaved}</p>
         </motion.div>
-      </motion.div>
+      </motion.div >
       <Footer />
     </>
   );

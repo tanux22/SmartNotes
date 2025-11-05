@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { tagSchema } from "./tagSchema.js";
 
 const noteSchema = mongoose.Schema({
     user_id: {
@@ -18,10 +19,13 @@ const noteSchema = mongoose.Schema({
     content: {
         type: String,
         required: true
-    }
+    },
+    tags: [tagSchema],
 }, {
     timestamps: true
 });
+
+
 
 const Note = mongoose.model("Note", noteSchema);
 export default Note;
