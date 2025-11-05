@@ -269,7 +269,7 @@ export default function EditNotePage({ onSave }) {
   const fetchNote = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      const response = await axios.get(`http://localhost:3000/api/notes/${note_id}`, {
+      const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/notes/${note_id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -296,7 +296,7 @@ export default function EditNotePage({ onSave }) {
       const token = localStorage.getItem("accessToken");
 
       await axios.put(
-        `http://localhost:3000/api/notes/${note_id}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/notes/${note_id}`,
         {
           title,
           content,

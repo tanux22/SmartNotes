@@ -32,7 +32,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:3000/api/user/signup", {
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/user/signup`, {
         username,
         email,
         password

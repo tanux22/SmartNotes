@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { streamAIContent } from "../utils/geminiApi";
+// import { streamAIContent } from "../utils/geminiApi";
+import { fetchAIResponse } from "../utils/langchainAPI.js";
+
 
 const AIGeneratorModal = ({ isOpen, onClose, onAccept }) => {
     const [prompt, setPrompt] = useState("");
@@ -17,26 +19,74 @@ const AIGeneratorModal = ({ isOpen, onClose, onAccept }) => {
 
     if (!isOpen) return null;
 
+    // const handleGenerate = async () => {
+    //     if (!prompt.trim()) return alert("Please enter a prompt!");
+    //     setLoading(true);
+    //     setAiResponse("");
+
+    //     try {
+    //         let buffer = "";
+    //         let timeoutId = null;
+
+    //         await streamAIContent(prompt, (chunk) => {
+    //             buffer += chunk;
+
+    //             if (!timeoutId) {
+    //                 timeoutId = setTimeout(() => {
+    //                     setAiResponse((prev) => prev + buffer);
+    //                     buffer = "";
+    //                     timeoutId = null;
+    //                 }, 100);
+    //             }
+    //         });
+    //     } catch (err) {
+    //         console.error(err);
+    //         alert("Streaming failed. Try again.");
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
+
     const handleGenerate = async () => {
         if (!prompt.trim()) return alert("Please enter a prompt!");
         setLoading(true);
         setAiResponse("");
 
         try {
-            let buffer = "";
-            let timeoutId = null;
-
-            await streamAIContent(prompt, (chunk) => {
-                buffer += chunk;
-
-                if (!timeoutId) {
-                    timeoutId = setTimeout(() => {
-                        setAiResponse((prev) => prev + buffer);
-                        buffer = "";
-                        timeoutId = null;
-                    }, 100);
-                }
+            const response = await fetch(`${import.meta.env.VITE_LANGCHAIN_FASTAPI_URL}/generate-stream`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ prompt }),
             });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+
+            let textBuffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n");
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const content = line.replace("data: ", "").trim();
+
+                        if (content === "[END]") return;
+                        if (content.startsWith("[ERROR]")) {
+                            console.error(content);
+                            return;
+                        }
+
+                        setAiResponse((prev) => prev + content);
+                    }
+                }
+            }
         } catch (err) {
             console.error(err);
             alert("Streaming failed. Try again.");
@@ -44,6 +94,7 @@ const AIGeneratorModal = ({ isOpen, onClose, onAccept }) => {
             setLoading(false);
         }
     };
+
 
     return (
         <motion.div
@@ -75,8 +126,8 @@ const AIGeneratorModal = ({ isOpen, onClose, onAccept }) => {
                     onClick={handleGenerate}
                     disabled={loading}
                     className={`mt-5 w-full py-3 rounded-xl font-semibold transition-all ${loading
-                            ? "bg-blue-800 text-gray-300 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                        ? "bg-blue-800 text-gray-300 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
                         }`}
                 >
                     {loading ? "Generating..." : "✨ Generate Content"}
