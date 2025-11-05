@@ -17,7 +17,7 @@ export default function AddFolderModal({ isOpen, onClose, onFolderAdded }) {
     try {
       setLoading(true);
       const response = await axios.post(
-        "http://localhost:3000/api/folders",
+        `${import.meta.env.VITE_BACKEND_URL}/api/folders`,
         { name: folderName },
         {
           headers: {

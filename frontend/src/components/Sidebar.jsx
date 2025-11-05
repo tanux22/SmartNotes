@@ -14,7 +14,7 @@ export default function Sidebar({ folders, selectedFolder, onSelectFolder, onFol
 
   const handleDeleteFolder = async (folder) => {
     try {
-      await axios.delete(`http://localhost:3000/api/folders/${folder._id}`, {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/folders/${folder._id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
       });
       refreshFolders();
@@ -28,7 +28,7 @@ export default function Sidebar({ folders, selectedFolder, onSelectFolder, onFol
     if (!editFolderName.trim()) return; // Don't allow empty names
     try {
       await axios.put(
-        `http://localhost:3000/api/folders/${folder._id}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/folders/${folder._id}`,
         { name: editFolderName },
         { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` } }
       );

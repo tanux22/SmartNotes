@@ -3,7 +3,7 @@
 export const streamAIContent = async (prompt, onChunk) => {
   const token = localStorage.getItem("accessToken");
 
-  const response = await fetch("http://localhost:3000/api/gemini-ai/stream", {
+  const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/gemini-ai/stream`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,

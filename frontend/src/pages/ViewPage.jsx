@@ -24,7 +24,7 @@ const ViewPage = () => {
       try {
         const token = localStorage.getItem("accessToken");
         const response = await axios.get(
-          `http://localhost:3000/api/notes/${note_id}`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/notes/${note_id}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }

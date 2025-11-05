@@ -259,7 +259,7 @@ export default function CreateNotePage() {
       const content = JSON.stringify(editor.getJSON());
       const token = localStorage.getItem("accessToken");
       await axios.post(
-        "http://localhost:3000/api/notes",
+        `${import.meta.env.VITE_BACKEND_URL}/api/notes`,
         { title, content, folder_id },
         { headers: { Authorization: `Bearer ${token}` } }
       );

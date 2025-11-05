@@ -30,7 +30,7 @@ export default function HomePage() {
 
   const fetchFolders = async () => {
     try {
-      const response = await axios.get("http://localhost:3000/api/folders", {
+      const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/folders`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -46,7 +46,7 @@ export default function HomePage() {
 
   const fetchNotes = async () => {
     try {
-      const response = await axios.get("http://localhost:3000/api/notes", {
+      const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/notes`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -94,7 +94,8 @@ export default function HomePage() {
   const handleDelete = async (id) => {
     try {
       setNotes(notes.filter((n) => n.id !== id));
-      const response = await axios.delete(`http://localhost:3000/api/notes/${id}`, {
+      const response = await axios.delete(
+        `${import.meta.env.VITE_BACKEND_URL}/api/notes/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
       });
     } catch (error) {

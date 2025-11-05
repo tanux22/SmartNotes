@@ -21,7 +21,7 @@ export default function NotesHeader({
     try {
       const token = localStorage.getItem("accessToken");
       const response = await axios.get(
-        `http://localhost:3000/api/notes/search?query=${encodeURIComponent(query)}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/notes/search?query=${encodeURIComponent(query)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

@@ -16,7 +16,7 @@ export default function useNoteSearch(searchQuery) {
       try {
         const token = localStorage.getItem("accessToken");
         const response = await axios.get(
-          `http://localhost:3000/api/notes/search?query=${encodeURIComponent(searchQuery)}`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/notes/search?query=${encodeURIComponent(searchQuery)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setResults(response.data.data || response.data); // adjust depending on your backend response
