@@ -15,6 +15,9 @@ export default function HomePage() {
   const [notes, setNotes] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState({ _id: "All", name: "All" });
   const [filteredNotes, setFilteredNotes] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -67,13 +70,26 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    console.log("Filtered notes changed:", filteredNotes);
-    console.log("Selected folder changed:", selectedFolder.name);
-    selectedFolder.name === "All"
-      ? setFilteredNotes(notes)
-      : setFilteredNotes(notes.filter((note) => note.folder === selectedFolder.name));
-    console.log("All notes:", notes);
-  }, [selectedFolder, notes]);
+    if (searchQuery.trim()) {
+      // When search active, only show ranked search results
+      const rankedIds = searchResults.map((r) => r.id);
+      const matchedNotes = notes.filter((n) => rankedIds.includes(n.id));
+      // Sort by score order
+      matchedNotes.sort(
+        (a, b) =>
+          searchResults.find((r) => r.id === b.id)?.score -
+          searchResults.find((r) => r.id === a.id)?.score
+      );
+      setFilteredNotes(matchedNotes);
+    } else {
+      // Otherwise show by folder
+      setFilteredNotes(
+        selectedFolder.name === "All"
+          ? notes
+          : notes.filter((n) => n.folder === selectedFolder.name)
+      );
+    }
+  }, [searchResults, searchQuery, selectedFolder, notes]);
 
   const handleDelete = async (id) => {
     try {
@@ -152,6 +168,9 @@ export default function HomePage() {
             total={notes.length}
             folderCount={filteredNotes.length}
             selectedFolder={selectedFolder}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onSearchResults={setSearchResults}
           />
 
           {/* Notes Grid */}

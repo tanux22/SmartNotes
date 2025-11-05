@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router";
 import {
@@ -20,6 +20,8 @@ import {
   FaRedo,
   FaImage,
   FaDownload,
+  FaMicrophone,
+  FaMicrophoneSlash,
   FaTrash,
 } from "react-icons/fa";
 import axios from "axios";
@@ -33,6 +35,7 @@ import { TextStyle, FontFamily, Color } from "@tiptap/extension-text-style";
 import { Image } from "../components/tiptap-node/image-node/image-node-extension";
 import styles from "../styles/TiptapEditor.module.css";
 import Footer from "../components/Footer";
+import AIGeneratorModal from "../components/AIGeneratorModal";
 
 export default function CreateNotePage() {
   const [title, setTitle] = useState("");
@@ -43,6 +46,11 @@ export default function CreateNotePage() {
   const [imageWidth, setImageWidth] = useState(400);
   const navigate = useNavigate();
   const { folderId: folder_id } = useParams();
+  const [isListening, setIsListening] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const recognitionRef = useRef(null);
+
+
 
   // 🧠 Initialize TipTap Editor
   const editor = useEditor({
@@ -75,6 +83,64 @@ export default function CreateNotePage() {
       setWordCount(text.trim().split(/\s+/).filter(Boolean).length);
     },
   });
+
+
+  useEffect(() => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      console.warn("Speech Recognition API not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        transcript += result[0].transcript;
+      }
+
+      if (editor && transcript.trim()) {
+        editor.commands.focus("end");
+        editor.commands.insertContent(transcript + " ");
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, [editor]);
+
+  const toggleListening = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      recognition.start();
+      setIsListening(true);
+    }
+  };
+
 
   if (!editor) return null;
 
@@ -231,8 +297,21 @@ export default function CreateNotePage() {
     { label: "Delete Image", action: "delete-image", icon: FaTrash },
   ];
 
+  const handleAIContentAccept = (generatedText) => {
+    if (editor) {
+      editor.chain().focus().insertContent(generatedText).run();
+    }
+  };
+
   return (
     <>
+
+      <AIGeneratorModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onAccept={handleAIContentAccept}
+      />
+
       <motion.div
         className="h-screen pt-20 px-10 py-10 bg-gradient-to-br from-[#050510] via-[#0c0c1f] to-[#131336] text-gray-100 relative overflow-y-auto"
         initial={{ opacity: 0 }}
@@ -273,7 +352,18 @@ export default function CreateNotePage() {
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.6 }}
           >
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-fuchsia-600 to-purple-500 text-white rounded-lg hover:brightness-110 transition shadow-md shadow-fuchsia-600/30">
+            {/* 🎙 Microphone Button */}
+            <button
+              onClick={toggleListening}
+              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md transition 
+                ${isListening ? "bg-red-500 animate-pulse" : "bg-blue-500 hover:bg-blue-600"}`}
+              title={isListening ? "Stop Recording" : "Start Voice Input"}
+            >
+              {isListening ? <FaMicrophoneSlash size={14} /> : <FaMicrophone size={14} />}
+            </button>
+
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-fuchsia-600 to-purple-500 text-white rounded-lg hover:brightness-110 transition shadow-md shadow-fuchsia-600/30"
+              onClick={() => setIsAIModalOpen(true)}>
               <FaMagic size={14} /> Generate using AI
             </button>
 

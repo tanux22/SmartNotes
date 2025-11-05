@@ -1,5 +1,6 @@
 import Folder from "../models/folderModel.js";
 import Note from "../models/notesModel.js";
+import { extractTextFromJSON, generateTagsWithCount } from "../utils/Notes.js";
 
 
 const getAllNotes = async (req, res, next) => {
@@ -25,7 +26,7 @@ const getAllNotes = async (req, res, next) => {
 const getNoteById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const note = await Note.findOne({ _id: id, user_id: req.user.id }); 
+        const note = await Note.findOne({ _id: id, user_id: req.user.id });
         if (!note) {
             const error = new Error(`Note with ID ${id} not found`);
             error.statusCode = 404;
@@ -54,7 +55,13 @@ const createNote = async (req, res, next) => {
             return next(error);
         }
 
-        const newNote = new Note({ user_id: req.user.id, folder_id: folder_id, title, content });
+        const extractedText = extractTextFromJSON(content);
+        console.log("Extracted Text:", extractedText);
+
+        const tags = generateTagsWithCount(extractedText);
+        console.log("Generated Tags:", tags);
+
+        const newNote = new Note({ user_id: req.user.id, folder_id: folder_id, title, content, tags });
         await newNote.save();
         res.sendResponse(newNote, 201);
     }
@@ -78,7 +85,13 @@ const updateNote = async (req, res, next) => {
 
         const updatedData = {};
         if (title) updatedData.title = title;
-        if (content) updatedData.content = content;
+        if (content) {
+            updatedData.content = content;
+            const extractedText = extractTextFromJSON(content);
+            const tags = generateTagsWithCount(extractedText);
+            updatedData.tags = tags;
+        }
+
         if (folder_id) {
             const folder = await Folder.findOne({ _id: folder_id, user_id: req.user.id });
             if (!folder) {
@@ -124,6 +137,57 @@ const deleteNote = async (req, res, next) => {
     }
 };
 
+// controllers/noteController.js
+
+const searchNotes = async (req, res, next) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) {
+      const error = new Error("Search query is required");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Tokenize query into words
+    const searchWords = query
+      .toLowerCase()
+      .match(/\b[a-z]{3,}\b/g)
+      ?.filter(Boolean) || [];
+
+    if (searchWords.length === 0) {
+      return res.sendResponse([], 200);
+    }
+
+    // Fetch user notes
+    const notes = await Note.find({ user_id: req.user.id });
+
+    // If notes array is empty
+    if (!notes.length) {
+      return res.sendResponse([], 200);
+    }
+
+    // Rank by matching tag counts
+    const rankedNotes = notes
+      .map((note) => {
+        let score = 0;
+        for (const tag of note.tags || []) {
+          if (searchWords.includes(tag.tag)) {
+            score += tag.count;
+          }
+        }
+        return { id: note._id, title: note.title, score };
+      })
+      .filter((n) => n.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    res.sendResponse(rankedNotes, 200);
+  } catch (error) {
+    console.error("Search error:", error);
+    next(error);
+  }
+};
 
 
-export { getAllNotes,  createNote, updateNote, deleteNote, getNoteById };
+
+export { getAllNotes, createNote, updateNote, deleteNote, getNoteById, searchNotes };

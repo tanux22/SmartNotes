@@ -1,8 +1,9 @@
 import express from 'express';
-import generateContent from '../controllers/aiController.js';
+import { streamAIContent } from '../controllers/aiController.js';
+// import generateContent from '../controllers/aiController.js';
 
 const aiRouter= express.Router();
 
-aiRouter.post("/generate", generateContent);
+aiRouter.post("/stream", streamAIContent);
 
 export default aiRouter;
