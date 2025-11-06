@@ -39,7 +39,10 @@ jobs:
         - name: 🧰 Build Docker Image for Frontend
           run: |
             cd frontend
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_FRONTEND_REPO }}:${{ github.sha }} .
+            docker build \
+            --build-arg VITE_BACKEND_URL=${{ secrets.VITE_BACKEND_URL }} \
+            --build-arg VITE_LANGCHAIN_FASTAPI_URL=${{ secrets.VITE_LANGCHAIN_FASTAPI_URL }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_FRONTEND_REPO }}:${{ github.sha }} .
 
         - name: 🚀 Push Docker Image for Frontend
           run: |

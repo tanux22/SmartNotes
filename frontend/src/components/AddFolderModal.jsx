@@ -78,9 +78,8 @@ export default function AddFolderModal({ isOpen, onClose, onFolderAdded }) {
                 </button>
                 <button
                   type="submit"
-                  className={`px-5 py-2 bg-blue-500 rounded hover:bg-blue-600 ${
-                    loading ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
+                  className={`px-5 py-2 bg-blue-500 rounded hover:bg-blue-600 ${loading ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   disabled={loading}
                 >
                   {loading ? "Adding..." : "Add"}
