@@ -9,7 +9,6 @@ jobs:
   docker:
       name: 🐳 Build and Push Docker Images for Frontend & Backend
       runs-on: ubuntu-latest
-      needs: [test]
       steps:
         - name: 📥 Checkout Code
           uses: actions/checkout@v3
