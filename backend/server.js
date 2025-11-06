@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();  
+dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
@@ -19,19 +19,23 @@ cloudinary.v2.config({
 });
 
 
-
 const app = express();
+
 app.use(cors(
   {
-    origin: 'http://localhost:5173',
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   }
 ));
-app.use(express.json({limit: '10mb'}));
+app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
 connectDB();
+
+app.get("/test", (req, res) => {
+  res.send("API is working properly");
+});
 
 // app.use(redisRateLimiter(100, 10));
 
@@ -49,8 +53,6 @@ app.use((req, res, next) => {
 
 app.use(errorHandler);
 
-
-
 app.listen(process.env.PORT || 3000, () => {
-    console.log(`Server is running on port ${process.env.PORT || 3000}`);
+  console.log(`Server is running on port ${process.env.PORT || 3000}`);
 })
