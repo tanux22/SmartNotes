@@ -1,39 +1,47 @@
-docker:
-    name: 🐳 Build and Push Docker Images for Frontend & Backend
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v3
+name: CI/CD Pipeline for Render with Docker
 
-      # Build and push backend image
-      - name: 🔐 Docker Login for Backend
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+on:
+  push:
+    branches:
+      - "**" # Run on all branches
 
-      - name: 🧰 Build Docker Image for Backend
-        run: |
-          cd backend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }} .
+jobs:
+  docker:
+      name: 🐳 Build and Push Docker Images for Frontend & Backend
+      runs-on: ubuntu-latest
+      needs: [test]
+      steps:
+        - name: 📥 Checkout Code
+          uses: actions/checkout@v3
 
-      - name: 🚀 Push Docker Image for Backend
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }}
+        # Build and push backend image
+        - name: 🔐 Docker Login for Backend
+          uses: docker/login-action@v2
+          with:
+            username: ${{ secrets.DOCKER_USERNAME }}
+            password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build and push frontend image
-      - name: 🔐 Docker Login for Frontend
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+        - name: 🧰 Build Docker Image for Backend
+          run: |
+            cd backend
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }} .
 
-      - name: 🧰 Build Docker Image for Frontend
-        run: |
-          cd frontend
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }} .
+        - name: 🚀 Push Docker Image for Backend
+          run: |
+            docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }}
 
-      - name: 🚀 Push Docker Image for Frontend
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }}
+        # Build and push frontend image
+        - name: 🔐 Docker Login for Frontend
+          uses: docker/login-action@v2
+          with:
+            username: ${{ secrets.DOCKER_USERNAME }}
+            password: ${{ secrets.DOCKER_PASSWORD }}
+
+        - name: 🧰 Build Docker Image for Frontend
+          run: |
+            cd frontend
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }} .
+
+        - name: 🚀 Push Docker Image for Frontend
+          run: |
+            docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }}
