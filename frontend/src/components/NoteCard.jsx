@@ -97,3 +97,4 @@ export default function NoteCard({ note, onDelete }) {
     </motion.div>
   );
 }
+//hello
