@@ -23,11 +23,11 @@ jobs:
         - name: 🧰 Build Docker Image for Backend
           run: |
             cd backend
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }} .
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_BACKEND_REPO }}:${{ github.sha }} .
 
         - name: 🚀 Push Docker Image for Backend
           run: |
-            docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-backend:${{ github.sha }}
+            docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_BACKEND_REPO }}:${{ github.sha }}
 
         # Build and push frontend image
         - name: 🔐 Docker Login for Frontend
@@ -39,8 +39,8 @@ jobs:
         - name: 🧰 Build Docker Image for Frontend
           run: |
             cd frontend
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }} .
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_FRONTEND_REPO }}:${{ github.sha }} .
 
         - name: 🚀 Push Docker Image for Frontend
           run: |
-            docker push ${{ secrets.DOCKER_USERNAME }}/hackfolio-frontend:${{ github.sha }}
+            docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_FRONTEND_REPO }}:${{ github.sha }}
